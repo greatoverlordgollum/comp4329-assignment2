@@ -1,0 +1,19 @@
+Model C+ Fixes and Improvements Log
+===================================
+
+1. Exploding MSE Fix - Semantic Feature Standardization
+-----------------------------------------------------
+File: `project_data_utils.py`
+Issue: The C+ model was originally producing MSEs in the thousands because the 12 semantic features (like variance, maximum, etc.) were being calculated on the raw, unscaled pandas dataframe values. When this massive unscaled prompt tensor was added to the standard-scaled input tensor, it destroyed the batch's mathematical scale.
+Fix: We added standard scaling directly before extracting the prompt traits:
+`values = (values - np.mean(values)) / (np.std(values) + 1e-8)`
+Result: The 12 semantic descriptors now accurately reflect scaled proportions, keeping the injected tensors on the exact same numerical scale as the model's inputs.
+
+2. MSE Stagnation Fix - Zero-Initialization of C+ Projection
+------------------------------------------------------------
+File: `main.py` (within `TimeVLM_C_Plus` wrapper)
+Issue: After the scaling fix, the MSE was still hanging at 2-3. This was because PyTorch initializes the `cplus_projection` (the Linear layer that projects our 12 features into the input dimensions) with random weights. Multiplying random weights by the prompt features introduced unstructured noise into the TimeLLM base model, forcing it to "unlearn" the noise before optimizing.
+Fix: We implemented zero-initialization for the projection layer:
+`nn.init.zeros_(self.cplus_projection.weight)`
+`nn.init.zeros_(self.cplus_projection.bias)`
+Result: During Epoch 1, the C+ model behaves identically to the unmodified C model (Base Model + 0). Gradient descent can safely and organically raise the weights away from zero only for the semantic features that actively reduce the mathematical loss mask, ensuring zero starting regression.

@@ -61,40 +61,38 @@ class MockConfigs:
 class TimeVLM_C_Plus(nn.Module):
     """
     Wraps the official TimeLLM model.
-    To avoid architectural regression, we pass inputs normally, but intercept and inject 
-    our enhanced C+ prompt features into the LLM reprogramming/projection directly 
-    without touching the original underlying weights.
+    Instead of directly contaminating the input tensor 'x' with global statistics
+    (which destroyed the RevIN normalization and Patching mechanic), we implement
+    authentic Textual Prompting as described in the paper plan.
+    We dynamically construct the textual dataset description for the LLM 
+    to embed using our extracted 12 semantic features.
     """
-    def __init__(self, configs, use_enhanced_prompt=False):
+    def __init__(self, configs, use_enhanced_prompt=False, prompt_vec=None):
         super().__init__()
         self.base_model = TimeLLMReal(configs)
         self.use_enhanced_prompt = use_enhanced_prompt
         
-        # If enhanced prompt (C+), map our 12 features into the LLM's dimension
-        # and add it to the patching flow.
-        if use_enhanced_prompt:
-            self.cplus_projection = nn.Linear(12, configs.d_model)
+        if use_enhanced_prompt and prompt_vec is not None:
+            vec = prompt_vec.tolist()
+            enhanced_desc = (
+                f"Dataset context: Complex time-series. "
+                f"Mean: {vec[0]:.2f}, Median: {vec[1]:.2f}, Std: {vec[2]:.2f}. "
+                f"Trend slope: {vec[5]:.4f}, Trend strength: {vec[6]:.4f}. "
+                f"Rolling variance: {vec[7]:.4f}, Overall variance: {vec[8]:.4f}. "
+                f"Autocorrelation lag1: {vec[9]:.4f}. "
+                f"Stability shifts - Mean diff: {vec[10]:.4f}, Var diff: {vec[11]:.4f}. "
+                f"Interpretation: The series requires careful structural evaluation."
+            )
+            # Inject directly into the TimeLLM base model's prompt generator
+            self.base_model.description = enhanced_desc
             
-    def forward(self, x, prompt_vec):
+    def forward(self, x, prompt_vec=None):
         # The original repo expects multi-tensor inputs (x_enc, x_mark_enc, etc.)
         # We dummy out marks for the simple benchmark if they aren't strictly generated.
         B, L, M = x.shape
         x_mark = torch.zeros(B, L, 4).to(x.device) 
         x_dec = torch.zeros(B, 96, M).to(x.device) # pred_len normally
         x_mark_dec = torch.zeros(B, 96, 4).to(x.device)
-        
-        # If we are using C+, we intercept and inject our prompt
-        # otherwise we just call the base model.
-        if self.use_enhanced_prompt:
-            # Here we perform lightweight prompt fusion.
-            # In a real VLM this combines at the embedding layer. 
-            # We project the prompt vector and sum it before handing off, to alter the attention.
-            p_emb = self.cplus_projection(prompt_vec).unsqueeze(1) # [B, 1, d_model]
-            
-            # Note: A full deep-integration requires modifying TimeLLM's internal attention loop.
-            # For timeline reasons (1 month plan), we fuse it directly to the normalized input tensor.
-            # A true architectural projection modifies TimeLLM directly. 
-            pass
 
         # Call original codebase execution
         dec_out = self.base_model(x, x_mark, x_dec, x_mark_dec)
@@ -121,16 +119,17 @@ def run_experiment(model_type, dataset_name, fraction, seq_len=96, pred_len=96, 
     elif model_type == "Autoformer/FEDformer":
         model = AutoformerReal(configs)
     elif model_type == "Model C (Original)":
-        model = TimeVLM_C_Plus(configs, use_enhanced_prompt=False)
+        model = TimeVLM_C_Plus(configs, use_enhanced_prompt=False, prompt_vec=prompt_vec)
     elif model_type == "Model C+ (Enhanced)":
-        model = TimeVLM_C_Plus(configs, use_enhanced_prompt=True)
+        model = TimeVLM_C_Plus(configs, use_enhanced_prompt=True, prompt_vec=prompt_vec)
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
         
     trainable_params, total_params = count_parameters(model)
     
-    optimizer = optim.Adam(model.parameters(), lr=0.005)
+    # Use a safer learning rate for delicate text-prompt fusion 
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
     criterion = nn.MSELoss()
     
     # Train Loop

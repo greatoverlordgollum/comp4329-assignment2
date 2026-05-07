@@ -11,6 +11,9 @@ def extract_cplus_prompt_stats(df, variant="full"):
     """
     values = df.iloc[:, -1].dropna().values
     
+    # Scale the raw values so the prompt features don't blow up the network
+    values = (values - np.mean(values)) / (np.std(values) + 1e-8)
+    
     if len(values) == 0:
         return torch.zeros(12, dtype=torch.float32)
 
