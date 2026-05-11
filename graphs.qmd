@@ -1,0 +1,111 @@
+---
+title: "Graphs"
+author: "Aniket Sinha and Veronica Tsou"
+format: 
+  html:
+    embed-resources: true
+    code-fold: true
+---
+
+```{r}
+#| warning: false
+#| message: false
+library(tidyverse)
+exp1 = read.csv("Experiment1_FullData.csv") %>% mutate(Model = ifelse(Model == "Model C+ (Enhanced)", "StatPrompt-LLM", Model))
+exp2 = read.csv("Experiment2_FewShot.csv") %>% mutate(Model = ifelse(Model == "Model C+ (Enhanced)", "StatPrompt-LLM", Model))
+exp3 = read.csv("Experiment3_Ablations.csv") %>% mutate(Model = ifelse(Model == "Model C+ (Enhanced)", "StatPrompt-LLM", Model))
+exp4 = read.csv("Experiment4_Efficiency.csv") %>% mutate(Model = ifelse(Model == "Model C+ (Enhanced)", "StatPrompt-LLM", Model))
+```
+
+# Experiment 1 - Full Data
+
+**Note**: For both Mean Squared Error (MSE) and Mean Absolute Error (MAE), **lower** values are better, as they indicate smaller prediction errors.
+
+```{r}
+exp1 %>%
+  mutate(Model = factor(Model, levels = c("DLinear", "PatchTST", "Autoformer/FEDformer", "Model C (Original)", "StatPrompt-LLM"))) %>%
+  pivot_longer(cols = c(MSE, MAE), names_to = "Metric", values_to = "Score") %>%
+  ggplot(aes(x = Model, y = Score, fill = Metric)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ Dataset) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "MSE and MAE by Model (Full Data)", y = "Error Score", x = NULL)
+```
+
+```{r}
+exp1 %>%
+  mutate(Model = factor(Model, levels = c("DLinear", "PatchTST", "Autoformer/FEDformer", "Model C (Original)", "StatPrompt-LLM"))) %>%
+  pivot_longer(cols = c(Train_Time, Inf_Time), names_to = "Metric", values_to = "Score") %>%
+  ggplot(aes(x = Model, y = Score, fill = Metric)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ Dataset) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Training and Inference Time by Model (Full Data)", y = "Time (seconds)", x = NULL)
+```
+
+# Experiment 2 - Few-Shot
+
+**Note**: For both Mean Squared Error (MSE) and Mean Absolute Error (MAE), **lower** values are better, as they indicate smaller prediction errors.
+
+```{r}
+exp2 %>%
+  mutate(Model = factor(Model, levels = c("DLinear", "PatchTST", "Autoformer/FEDformer", "Model C (Original)", "StatPrompt-LLM"))) %>%
+  pivot_longer(cols = c(MSE, MAE), names_to = "Metric", values_to = "Score") %>%
+  ggplot(aes(x = Model, y = Score, fill = Metric)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ Dataset) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "MSE and MAE by Model (Few-Shot)", y = "Error Score", x = NULL)
+```
+
+```{r}
+exp2 %>%
+  mutate(Model = factor(Model, levels = c("DLinear", "PatchTST", "Autoformer/FEDformer", "Model C (Original)", "StatPrompt-LLM"))) %>%
+  pivot_longer(cols = c(Train_Time, Inf_Time), names_to = "Metric", values_to = "Score") %>%
+  ggplot(aes(x = Model, y = Score, fill = Metric)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ Dataset) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Training and Inference Time by Model (Full Data)", y = "Time (seconds)", x = NULL)
+```
+
+# Experiment 3 - Ablations
+
+```{r}
+exp3 %>%
+  pivot_longer(cols = c(MSE, MAE), names_to = "Metric", values_to = "Score") %>%
+  ggplot(aes(x = Variant, y = Score, fill = Metric)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ Dataset) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "MSE and MAE by Variant (Ablations)", y = "Error Score", x = "Ablation Variant")
+```
+
+```{r}
+exp3 %>%
+  pivot_longer(cols = c(Train_Time, Inf_Time), names_to = "Metric", values_to = "Score") %>%
+  ggplot(aes(x = Variant, y = Score, fill = Metric)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ Dataset) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Training and Inference Time by Variant (Ablations)", y = "Time (Seconds)", x = "Ablation Variant")
+```
+
+# Experiment 4 - Efficiency
+
+```{r}
+exp4 %>%
+  mutate(Model = factor(Model, levels = c("DLinear", "PatchTST", "Autoformer/FEDformer", "Model C (Original)", "StatPrompt-LLM"))) %>%
+  pivot_longer(cols = c(Train_Time, Inf_Time), names_to = "Metric", values_to = "Score") %>%
+  ggplot(aes(x = Model, y = Score, fill = Metric)) +
+  geom_col(position = "dodge") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Training and Inference Time by Model (Efficiency)", y = "Time (Seconds)", x = NULL)
+```
