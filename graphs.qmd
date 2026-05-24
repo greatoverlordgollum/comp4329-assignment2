@@ -100,12 +100,44 @@ exp3 %>%
 # Experiment 4 - Efficiency
 
 ```{r}
-exp4 %>%
-  mutate(Model = factor(Model, levels = c("DLinear", "PatchTST", "Autoformer/FEDformer", "Model C (Original)", "StatPrompt-LLM"))) %>%
+library(patchwork)
+
+df4 <- exp4 %>%
+  mutate(Model = if_else(Model == "Model C (Original)", "Time-LLM", Model)) %>%
+  mutate(Model = factor(Model, levels = c("DLinear", "PatchTST", "Autoformer/FEDformer", "Time-LLM", "StatPrompt-LLM"))) %>%
   pivot_longer(cols = c(Train_Time, Inf_Time), names_to = "Metric", values_to = "Score") %>%
-  ggplot(aes(x = Model, y = Score, fill = Metric)) +
-  geom_col(position = "dodge") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(title = "Training and Inference Time by Model (Efficiency)", y = "Time (Seconds)", x = NULL)
+  mutate(Metric = factor(if_else(Metric == "Train_Time", "Training Time", "Inference Time"), levels = c("Training Time", "Inference Time")))
+
+model_colors <- c("DLinear" = "#0072B2", "PatchTST" = "#E69F00", "Autoformer/FEDformer" = "#009E73", "Time-LLM" = "#CC79A7", "StatPrompt-LLM" = "#56B4E9")
+
+p1 <- df4 %>%
+  filter(Metric == "Training Time" & Model %in% c("Time-LLM", "StatPrompt-LLM")) %>%
+  ggplot(aes(x = Model, y = Score, fill = Model)) +
+  geom_col() +
+  scale_fill_manual(values = model_colors) +
+  theme_minimal(base_family = "serif", base_size = 14) +
+  theme(text = element_text(color = "black"),
+        axis.text = element_text(color = "black", size = 13),
+        axis.text.x = element_text(angle = 45, hjust = 1, color = "black", size = 13),
+        legend.position = "none") +
+  labs(title = "Training Time", y = "Time (Seconds)", x = NULL)
+
+p2 <- df4 %>%
+  filter(Metric == "Inference Time") %>%
+  ggplot(aes(x = Model, y = Score, fill = Model)) +
+  geom_col() +
+  scale_fill_manual(values = model_colors) +
+  theme_minimal(base_family = "serif", base_size = 14) +
+  theme(text = element_text(color = "black"),
+        axis.text = element_text(color = "black", size = 13),
+        axis.text.x = element_text(angle = 45, hjust = 1, color = "black", size = 13),
+        legend.position = "none") +
+  labs(title = "Inference Time", y = NULL, x = NULL)
+
+p1 + p2 + 
+  plot_layout(widths = c(3.5, 6.5)) +
+  plot_annotation(title = "Training and Inference Time by Model (Efficiency)",
+                  theme = theme(plot.title = element_text(family = "serif", color = "black", size = 16)))
+
+ggsave("Experiment4_Efficiency.pdf", width = 10, height = 6)
 ```
